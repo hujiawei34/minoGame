@@ -1,6 +1,11 @@
 # Snake WeChat Mini-Game 🐍
 
 A professional-grade Snake game built as a WeChat Mini-Game using modern game engine architecture with performance optimization and modular design.
+# TODO LIST
+- change background music
+- add sound when move,eat,gameover
+- add high scores screen
+- change move action use joystick
 
 ## 🎮 Features
 

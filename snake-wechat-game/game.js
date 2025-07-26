@@ -1,7 +1,206 @@
 // WeChat Mini-Game Entry Point
-// Complete Snake Game with integrated GameScene
+// Complete Snake Game with Audio System
 
 console.log('Initializing Snake Game...');
+
+// Audio System Class
+class AudioSystem {
+  constructor() {
+    this.bgMusic = null;
+    this.soundEffects = {};
+    this.musicEnabled = true;
+    this.soundEnabled = true;
+    this.musicVolume = 0.6;
+    this.soundVolume = 0.8;
+    this.currentBgMusic = null;
+    
+    this.initAudio();
+    this.loadSettings();
+  }
+
+  initAudio() {
+    try {
+      // Initialize background music
+      this.bgMusic = {
+        menu: wx.createInnerAudioContext(),
+        game: wx.createInnerAudioContext(),
+        gameOver: wx.createInnerAudioContext()
+      };
+
+      // Set up background music (using placeholder URLs - you can replace with actual music files)
+      this.bgMusic.menu.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+      this.bgMusic.menu.loop = true;
+      this.bgMusic.menu.volume = this.musicVolume;
+
+      this.bgMusic.game.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+      this.bgMusic.game.loop = true;
+      this.bgMusic.game.volume = this.musicVolume;
+
+      this.bgMusic.gameOver.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+      this.bgMusic.gameOver.loop = false;
+      this.bgMusic.gameOver.volume = this.musicVolume;
+
+      // Initialize sound effects
+      this.soundEffects = {
+        eat: wx.createInnerAudioContext(),
+        gameOver: wx.createInnerAudioContext(),
+        click: wx.createInnerAudioContext()
+      };
+
+      // Set up sound effects (using placeholder URLs)
+      this.soundEffects.eat.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+      this.soundEffects.eat.volume = this.soundVolume;
+
+      this.soundEffects.gameOver.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+      this.soundEffects.gameOver.volume = this.soundVolume;
+
+      this.soundEffects.click.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+      this.soundEffects.click.volume = this.soundVolume * 0.5;
+
+      console.log('🔊 Audio system initialized');
+    } catch (error) {
+      console.log('🔊 Audio initialization failed:', error);
+      // Fallback to vibration only
+      this.musicEnabled = false;
+      this.soundEnabled = false;
+    }
+  }
+
+  loadSettings() {
+    try {
+      const audioSettings = wx.getStorageSync('audioSettings');
+      if (audioSettings) {
+        this.musicEnabled = audioSettings.musicEnabled !== false;
+        this.soundEnabled = audioSettings.soundEnabled !== false;
+        this.musicVolume = audioSettings.musicVolume || 0.6;
+        this.soundVolume = audioSettings.soundVolume || 0.8;
+      }
+    } catch (error) {
+      console.log('🔊 Failed to load audio settings');
+    }
+  }
+
+  saveSettings() {
+    try {
+      wx.setStorageSync('audioSettings', {
+        musicEnabled: this.musicEnabled,
+        soundEnabled: this.soundEnabled,
+        musicVolume: this.musicVolume,
+        soundVolume: this.soundVolume
+      });
+    } catch (error) {
+      console.log('🔊 Failed to save audio settings');
+    }
+  }
+
+  playBackgroundMusic(type) {
+    if (!this.musicEnabled || !this.bgMusic) return;
+
+    try {
+      // Stop current background music
+      if (this.currentBgMusic) {
+        this.currentBgMusic.stop();
+      }
+
+      // Play new background music
+      if (this.bgMusic[type]) {
+        this.currentBgMusic = this.bgMusic[type];
+        this.currentBgMusic.play();
+        console.log(`🔊 Playing background music: ${type}`);
+      }
+    } catch (error) {
+      console.log('🔊 Failed to play background music:', error);
+    }
+  }
+
+  stopBackgroundMusic() {
+    if (this.currentBgMusic) {
+      try {
+        this.currentBgMusic.stop();
+        this.currentBgMusic = null;
+        console.log('🔊 Background music stopped');
+      } catch (error) {
+        console.log('🔊 Failed to stop background music:', error);
+      }
+    }
+  }
+
+  playSound(type) {
+    if (!this.soundEnabled || !this.soundEffects[type]) return;
+
+    try {
+      // Reset and play sound effect
+      this.soundEffects[type].seek(0);
+      this.soundEffects[type].play();
+      console.log(`🔊 Playing sound effect: ${type}`);
+    } catch (error) {
+      console.log('🔊 Failed to play sound effect:', error);
+      // Fallback to vibration
+      if (type === 'eat') {
+        wx.vibrateShort();
+      } else if (type === 'gameOver') {
+        wx.vibrateLong();
+      }
+    }
+  }
+
+  toggleMusic() {
+    this.musicEnabled = !this.musicEnabled;
+    if (!this.musicEnabled) {
+      this.stopBackgroundMusic();
+    }
+    this.saveSettings();
+    return this.musicEnabled;
+  }
+
+  toggleSound() {
+    this.soundEnabled = !this.soundEnabled;
+    this.saveSettings();
+    return this.soundEnabled;
+  }
+
+  setMusicVolume(volume) {
+    this.musicVolume = Math.max(0, Math.min(1, volume));
+    if (this.bgMusic) {
+      Object.values(this.bgMusic).forEach(audio => {
+        if (audio) audio.volume = this.musicVolume;
+      });
+    }
+    this.saveSettings();
+  }
+
+  setSoundVolume(volume) {
+    this.soundVolume = Math.max(0, Math.min(1, volume));
+    if (this.soundEffects) {
+      Object.values(this.soundEffects).forEach(audio => {
+        if (audio) audio.volume = this.soundVolume;
+      });
+    }
+    this.saveSettings();
+  }
+
+  destroy() {
+    try {
+      this.stopBackgroundMusic();
+      
+      if (this.bgMusic) {
+        Object.values(this.bgMusic).forEach(audio => {
+          if (audio) audio.destroy();
+        });
+      }
+      
+      if (this.soundEffects) {
+        Object.values(this.soundEffects).forEach(audio => {
+          if (audio) audio.destroy();
+        });
+      }
+      
+      console.log('🔊 Audio system destroyed');
+    } catch (error) {
+      console.log('🔊 Failed to destroy audio system:', error);
+    }
+  }
+}
 
 // Game Engine Class
 class GameEngine {
@@ -55,6 +254,9 @@ class GameEngine {
     
     // Storage System  
     this.systems.set('storage', new StorageSystem());
+    
+    // Audio System
+    this.systems.set('audio', new AudioSystem());
   }
 
   initScenes() {
@@ -83,6 +285,13 @@ class GameEngine {
     if (scene) {
       this.currentScene = scene;
       scene.init(data);
+      
+      // Play appropriate background music
+      const audio = this.getSystem('audio');
+      if (audio) {
+        audio.playBackgroundMusic(sceneName);
+      }
+      
       console.log('Scene switched to:', sceneName);
     } else {
       console.error('Scene not found:', sceneName);
@@ -110,6 +319,13 @@ class GameEngine {
     }
     
     requestAnimationFrame(() => this.gameLoop());
+  }
+
+  destroy() {
+    const audio = this.getSystem('audio');
+    if (audio) {
+      audio.destroy();
+    }
   }
 }
 
@@ -227,17 +443,48 @@ class MenuScene {
   constructor(engine) {
     this.engine = engine;
     this.name = 'menu';
+    this.audioButton = null;
   }
 
   init() {
     console.log('MenuScene initialized');
+    
+    // Setup audio button
+    const canvas = this.engine.canvas;
+    this.audioButton = {
+      x: canvas.width - 120,
+      y: 20,
+      width: 40,
+      height: 40
+    };
+    
     const input = this.engine.getSystem('input');
     if (input) {
-      input.on('tap', () => {
+      input.on('tap', (data) => {
+        const audio = this.engine.getSystem('audio');
+        
+        // Check if audio button was tapped
+        if (this.isPointInButton(data.x, data.y, this.audioButton)) {
+          if (audio) {
+            audio.toggleMusic();
+            audio.playSound('click');
+          }
+          return;
+        }
+        
+        // Start game
+        if (audio) {
+          audio.playSound('click');
+        }
         console.log('Game started!');
         this.engine.switchScene('game');
       });
     }
+  }
+
+  isPointInButton(x, y, button) {
+    return x >= button.x && x <= button.x + button.width && 
+           y >= button.y && y <= button.y + button.height;
   }
 
   render(ctx) {
@@ -269,6 +516,22 @@ class MenuScene {
     ctx.font = '18px Arial';
     ctx.fillText('Swipe to control snake direction', canvas.width / 2, canvas.height / 2 + 60);
     ctx.fillText('Tap to start game', canvas.width / 2, canvas.height / 2 + 90);
+    
+    // Audio button
+    const audio = this.engine.getSystem('audio');
+    if (audio) {
+      ctx.fillStyle = 'rgba(64, 145, 108, 0.8)';
+      ctx.fillRect(this.audioButton.x, this.audioButton.y, this.audioButton.width, this.audioButton.height);
+      
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '24px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        audio.musicEnabled ? '🔊' : '🔇',
+        this.audioButton.x + this.audioButton.width / 2,
+        this.audioButton.y + this.audioButton.height / 2 + 8
+      );
+    }
   }
 
   destroy() {
@@ -296,6 +559,7 @@ class GameScene {
     this.backgroundColor = '#1B4332';
     this.gridColor = 'rgba(64, 145, 108, 0.1)';
     this.pauseButton = null;
+    this.audioButton = null;
     this.lastMoveTime = 0;
     this.moveInterval = 200;
   }
@@ -375,6 +639,13 @@ class GameScene {
       height: 40,
       text: '⏸️'
     };
+    
+    this.audioButton = {
+      x: canvas.width - 120,
+      y: 20,
+      width: 40,
+      height: 40
+    };
   }
 
   handleSwipe(direction) {
@@ -406,8 +677,23 @@ class GameScene {
   handleTap(x, y) {
     console.log('🎮 handleTap() - Position:', x, y, 'State:', this.gameState);
     
+    const audio = this.engine.getSystem('audio');
+    
+    // Check audio button
+    if (this.isPointInButton(x, y, this.audioButton)) {
+      if (audio) {
+        audio.toggleMusic();
+        audio.playSound('click');
+      }
+      return;
+    }
+    
+    // Check pause button
     if (this.isPointInButton(x, y, this.pauseButton)) {
       this.togglePause();
+      if (audio) {
+        audio.playSound('click');
+      }
       return;
     }
     
@@ -495,10 +781,16 @@ class GameScene {
       storage.addRecentScore(this.score);
     }
     
-    try {
-      wx.vibrateLong();
-    } catch (error) {
-      console.log('🎮 gameOver() - Vibration not supported');
+    const audio = this.engine.getSystem('audio');
+    if (audio) {
+      audio.playSound('gameOver');
+    } else {
+      // Fallback to vibration
+      try {
+        wx.vibrateLong();
+      } catch (error) {
+        console.log('🎮 gameOver() - Vibration not supported');
+      }
     }
   }
 
@@ -562,10 +854,16 @@ class GameScene {
       this.snake.growing = true;
       this.generateFood();
       
-      try {
-        wx.vibrateShort();
-      } catch (error) {
-        // Vibration not supported
+      const audio = this.engine.getSystem('audio');
+      if (audio) {
+        audio.playSound('eat');
+      } else {
+        // Fallback to vibration
+        try {
+          wx.vibrateShort();
+        } catch (error) {
+          // Vibration not supported
+        }
       }
       
       this.moveInterval = Math.max(100, this.moveInterval - 2);
@@ -657,6 +955,7 @@ class GameScene {
     ctx.textAlign = 'left';
     ctx.fillText(`Score: ${this.score}`, 20, 40);
     
+    // Pause button
     if (this.gameState === 'playing' || this.gameState === 'paused') {
       ctx.fillStyle = 'rgba(64, 145, 108, 0.8)';
       ctx.fillRect(this.pauseButton.x, this.pauseButton.y, this.pauseButton.width, this.pauseButton.height);
@@ -668,6 +967,22 @@ class GameScene {
         this.gameState === 'playing' ? '⏸️' : '▶️',
         this.pauseButton.x + this.pauseButton.width / 2,
         this.pauseButton.y + this.pauseButton.height / 2 + 7
+      );
+    }
+    
+    // Audio button
+    const audio = this.engine.getSystem('audio');
+    if (audio) {
+      ctx.fillStyle = 'rgba(64, 145, 108, 0.8)';
+      ctx.fillRect(this.audioButton.x, this.audioButton.y, this.audioButton.width, this.audioButton.height);
+      
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '20px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        audio.musicEnabled ? '🔊' : '🔇',
+        this.audioButton.x + this.audioButton.width / 2,
+        this.audioButton.y + this.audioButton.height / 2 + 7
       );
     }
   }
@@ -754,6 +1069,10 @@ class GameOverScene {
     const input = this.engine.getSystem('input');
     if (input) {
       input.on('tap', () => {
+        const audio = this.engine.getSystem('audio');
+        if (audio) {
+          audio.playSound('click');
+        }
         this.engine.switchScene('menu');
       });
     }
@@ -801,6 +1120,10 @@ wx.onShow(() => {
 
 wx.onHide(() => {
   console.log('Game hidden');
+  const audio = game.getSystem('audio');
+  if (audio) {
+    audio.stopBackgroundMusic();
+  }
 });
 
 // Start the game
